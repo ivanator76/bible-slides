@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>聖經經文投影片產生器</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#3a2d55;border-radius:3px}
+body{min-height:100vh;background:linear-gradient(170deg,#0a0a12 0%,#12101f 40%,#1a1028 100%);color:#e8e0f0;font-family:'Noto Serif TC',Georgia,serif;overflow-y:auto}
+.header{text-align:center;padding:32px 20px 14px}
+.header .sub{font-size:12px;letter-spacing:7px;color:#C9A96E;margin-bottom:8px;font-weight:600}
+.header h1{font-size:clamp(26px,5vw,40px);font-weight:900;background:linear-gradient(135deg,#e8e0f0 0%,#C9A96E 50%,#e8e0f0 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite;line-height:1.3}
+.header p{color:#6a5f80;font-size:13px;margin-top:6px}
+@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+.container{max-width:780px;margin:0 auto;padding:0 18px 50px}
+.card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:24px;margin-bottom:20px}
+.card-label{font-size:13px;color:#8a7fa0;font-weight:600;margin-bottom:14px}
+.tabs{display:flex;justify-content:center;margin-bottom:26px}
+.tab-btn{padding:9px 26px;border:1px solid #3a2d55;background:transparent;color:#a09ab0;font-size:14px;cursor:pointer;font-family:'Noto Serif TC',Georgia,serif;font-weight:600;transition:all .3s}
+.tab-btn:first-child{border-radius:8px 0 0 8px}
+.tab-btn:last-child{border-radius:0 8px 8px 0}
+.tab-btn.active{background:linear-gradient(135deg,#2a1f45,#1e1535);color:#C9A96E;border-color:#C9A96E}
+.input-field{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e8e0f0;padding:11px 14px;font-size:14px;font-family:'Noto Serif TC',Georgia,serif;outline:none;transition:border-color .3s}
+.input-field:focus{border-color:#C9A96E}
+.input-field::placeholder{color:#5a5070}
+textarea.input-field{resize:vertical;min-height:110px;line-height:1.8}
+select.input-field{cursor:pointer}
+select option{background:#1a1028;color:#e8e0f0}
+.search-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.search-hint{font-size:11px;color:#5a5070}
+.btn-search{background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.3);color:#C9A96E;padding:9px 22px;border-radius:8px;cursor:pointer;font-family:'Noto Serif TC',Georgia,serif;font-weight:600;font-size:13px;transition:all .3s}
+.btn-search:hover{background:rgba(201,169,110,.25)}
+.btn-search:disabled{opacity:.5;cursor:not-allowed}
+.error-msg{margin-top:10px;padding:9px 13px;background:rgba(200,50,50,.1);border:1px solid rgba(200,50,50,.2);border-radius:8px;color:#e88;font-size:12px}
+.font-btn{padding:7px 14px;border-radius:8px;cursor:pointer;font-family:'Noto Serif TC',Georgia,serif;font-size:12px;font-weight:600;transition:all .2s;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#a09ab0}
+.font-btn.active{border-color:#C9A96E;background:rgba(201,169,110,.15);color:#C9A96E}
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:10px}
+.theme-card{border:2px solid transparent;border-radius:10px;padding:9px;cursor:pointer;transition:all .3s;text-align:center;background:rgba(255,255,255,.02)}
+.theme-card:hover{transform:translateY(-2px)}
+.theme-card.active{border-color:#C9A96E;box-shadow:0 0 14px rgba(201,169,110,.2);background:rgba(255,255,255,.05)}
+.theme-preview{width:100%;height:38px;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.theme-name{font-size:12px;font-weight:700;color:#c0b8d0}
+.theme-card.active .theme-name{color:#C9A96E}
+.theme-desc{font-size:10px;color:#6a5f80}
+.slide-preview{border-radius:10px;aspect-ratio:16/9;padding:5% 7%;display:flex;flex-direction:column;position:relative;overflow:hidden;margin-bottom:14px}
+.slide-preview:last-child{margin-bottom:0}
+.slide-line{position:absolute;left:7%;right:7%;height:1px;opacity:.3}
+.slide-title-text{position:absolute;top:9%;left:7%;right:7%;text-align:left;font-weight:700;letter-spacing:1px}
+.slide-body{line-height:1.15;text-align:left;padding:0;margin-top:22%;flex:1;overflow:hidden}
+.btn-generate{background:linear-gradient(135deg,#C9A96E,#A67C3D);color:#0F0A1A;border:none;padding:13px 36px;font-size:16px;font-weight:700;border-radius:8px;cursor:pointer;font-family:'Noto Serif TC',Georgia,serif;letter-spacing:2px;transition:all .3s;display:inline-block}
+.btn-generate:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 25px rgba(201,169,110,.35)}
+.btn-generate:disabled{opacity:.5;cursor:not-allowed}
+.center-area{text-align:center;margin-top:8px}
+.center-hint{color:#5a5070;font-size:11px;margin-top:8px}
+.fade-in{animation:fadeIn .4s ease-out}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="sub">✦ BIBLE VERSE SLIDE GENERATOR ✦</div>
+  <h1>聖經經文投影片</h1>
+  <p>輸入經文，一鍵生成精美 PowerPoint 投影片</p>
+</div>
+<div class="container">
+  <div class="tabs">
+    <button class="tab-btn" onclick="switchMode('manual')">手動輸入</button>
+    <button class="tab-btn active" onclick="switchMode('search')">經文查詢</button>
+  </div>
+  <div id="searchPanel" class="card fade-in">
+    <div class="card-label">選擇版本、書卷與章節</div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;color:#6a5f80;margin-bottom:4px">聖經版本</div>
+      <select id="versionSelect" class="input-field" onchange="onVersionChange()"></select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 80px 80px 80px;gap:10px 10px;margin-bottom:14px">
+      <div style="font-size:11px;color:#6a5f80">書卷</div>
+      <div style="font-size:11px;color:#6a5f80;text-align:center">章</div>
+      <div style="font-size:11px;color:#6a5f80;text-align:center">起始節</div>
+      <div style="font-size:11px;color:#6a5f80;text-align:center">結束節</div>
+      <select id="bookSelect" class="input-field" onchange="onBookChange()"></select>
+      <select id="chapterSelect" class="input-field" style="text-align:center" onchange="onChapterChange()"></select>
+      <select id="verseStartSelect" class="input-field" style="text-align:center" onchange="onVerseStartChange()"></select>
+      <select id="verseEndSelect" class="input-field" style="text-align:center"></select>
+    </div>
+    <div class="search-footer">
+      <span class="search-hint">首次查詢需載入資料</span>
+      <button id="searchBtn" class="btn-search" onclick="fetchVerse()">查詢經文</button>
+    </div>
+    <div id="errorMsg" class="error-msg" style="display:none"></div>
+  </div>
+  <div id="manualPanel" class="card fade-in" style="display:none">
+    <div class="card-label">經文內容</div>
+    <input id="referenceInput" class="input-field" placeholder="經文出處，例如：約翰福音 3:16" style="margin-bottom:12px" oninput="updatePreview()">
+    <textarea id="verseInput" class="input-field" placeholder="在此輸入或貼上經文內容⋯" rows="5" oninput="updatePreview()"></textarea>
+  </div>
+  <div class="card fade-in">
+    <div style="margin-bottom:22px">
+      <div class="card-label">經文字體大小</div>
+      <div id="fontOptions" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+    <div style="margin-bottom:22px">
+      <div class="card-label">標題（經文出處）字體大小</div>
+      <div id="titleFontOptions" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+    <div>
+      <div class="card-label">投影片主題</div>
+      <div class="theme-grid" id="themeGrid"></div>
+    </div>
+  </div>
+  <div id="previewCard" class="card fade-in" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="card-label" style="margin-bottom:0" id="previewLabel">預覽</div>
+    </div>
+    <div id="previewSlides"></div>
+  </div>
+  <div class="center-area">
+    <button id="generateBtn" class="btn-generate" onclick="generatePPTX()" disabled>下載 PowerPoint 投影片</button>
+    <div id="generateHint" class="center-hint">請先輸入經文出處與內容</div>
+  </div>
+</div>
+
+<script>
+/* ===== CONFIG ===== */
+const THEMES=[
+  {id:"classic",name:"經典白",desc:"教會投影",bg:"#FFFFFF",titleColor:"#6B4226",textColor:"#1A1A1A",accent:"#8B6914",pptBg:"FFFFFF",pptTitle:"6B4226",pptText:"1A1A1A",border:"1px solid #ddd"},
+  {id:"dark-navy",name:"深邃藍",desc:"莊嚴典雅",bg:"#0F1B2D",titleColor:"#C9A96E",textColor:"#E8E0D0",accent:"#C9A96E",pptBg:"0F1B2D",pptTitle:"C9A96E",pptText:"E8E0D0"},
+  {id:"parchment",name:"羊皮卷",desc:"溫暖古典",bg:"#F5ECD7",titleColor:"#5C3D2E",textColor:"#3E2723",accent:"#8D6E47",pptBg:"F5ECD7",pptTitle:"5C3D2E",pptText:"3E2723",border:"1px solid #d5c9a8"},
+  {id:"royal",name:"皇家紫",desc:"尊貴氣質",bg:"#1A0A2E",titleColor:"#D4A853",textColor:"#E0D6F0",accent:"#D4A853",pptBg:"1A0A2E",pptTitle:"D4A853",pptText:"E0D6F0"},
+  {id:"forest",name:"森林綠",desc:"平靜安穩",bg:"#0D2818",titleColor:"#A8C69F",textColor:"#DCE8D8",accent:"#6B8F5B",pptBg:"0D2818",pptTitle:"A8C69F",pptText:"DCE8D8"},
+  {id:"sunset",name:"夕陽暖",desc:"溫馨柔和",bg:"#2D1B14",titleColor:"#E8A87C",textColor:"#F0E0D0",accent:"#C0734A",pptBg:"2D1B14",pptTitle:"E8A87C",pptText:"F0E0D0"},
+];
+const FONT_SIZES=[{l:"24pt（小）",v:24},{l:"28pt",v:28},{l:"32pt",v:32},{l:"36pt",v:36},{l:"40pt",v:40},{l:"44pt（大）",v:44},{l:"48pt（特大）",v:48}];
+const TITLE_FONT_SIZES=[{l:"28pt",v:28},{l:"32pt",v:32},{l:"36pt",v:36},{l:"40pt",v:40}];
+
+const VERSIONS=[
+  {id:"cuv-t",name:"和合本（繁體中文）",lang:"zh-t",dataKey:"cuv",url:"https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/zh_cuv.json"},
+  {id:"cuv-s",name:"和合本（簡體中文）",lang:"zh-s",dataKey:"cuv",url:"https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/zh_cuv.json"},
+  {id:"KJV",name:"KJV (King James Version)",lang:"en",dataKey:"kjv",url:"https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/en_kjv.json"},
+  {id:"BBE",name:"BBE (Bible in Basic English)",lang:"en",dataKey:"bbe",url:"https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/en_bbe.json"},
+];
+
+// 66 books: [traditional, simplified, english, url-slug, chapters]
+const BOOKS=[
+["創世記","创世记","Genesis","genesis",50],["出埃及記","出埃及记","Exodus","exodus",40],["利未記","利未记","Leviticus","leviticus",27],["民數記","民数记","Numbers","numbers",36],["申命記","申命记","Deuteronomy","deuteronomy",34],["約書亞記","约书亚记","Joshua","joshua",24],["士師記","士师记","Judges","judges",21],["路得記","路得记","Ruth","ruth",4],["撒母耳記上","撒母耳记上","1 Samuel","1-samuel",31],["撒母耳記下","撒母耳记下","2 Samuel","2-samuel",24],["列王紀上","列王纪上","1 Kings","1-kings",22],["列王紀下","列王纪下","2 Kings","2-kings",25],["歷代志上","历代志上","1 Chronicles","1-chronicles",29],["歷代志下","历代志下","2 Chronicles","2-chronicles",36],["以斯拉記","以斯拉记","Ezra","ezra",10],["尼希米記","尼希米记","Nehemiah","nehemiah",13],["以斯帖記","以斯帖记","Esther","esther",10],["約伯記","约伯记","Job","job",42],["詩篇","诗篇","Psalms","psalms",150],["箴言","箴言","Proverbs","proverbs",31],["傳道書","传道书","Ecclesiastes","ecclesiastes",12],["雅歌","雅歌","Song of Solomon","song-of-solomon",8],["以賽亞書","以赛亚书","Isaiah","isaiah",66],["耶利米書","耶利米书","Jeremiah","jeremiah",52],["耶利米哀歌","耶利米哀歌","Lamentations","lamentations",5],["以西結書","以西结书","Ezekiel","ezekiel",48],["但以理書","但以理书","Daniel","daniel",12],["何西阿書","何西阿书","Hosea","hosea",14],["約珥書","约珥书","Joel","joel",3],["阿摩司書","阿摩司书","Amos","amos",9],["俄巴底亞書","俄巴底亚书","Obadiah","obadiah",1],["約拿書","约拿书","Jonah","jonah",4],["彌迦書","弥迦书","Micah","micah",7],["那鴻書","那鸿书","Nahum","nahum",3],["哈巴谷書","哈巴谷书","Habakkuk","habakkuk",3],["西番雅書","西番雅书","Zephaniah","zephaniah",3],["哈該書","哈该书","Haggai","haggai",2],["撒迦利亞書","撒迦利亚书","Zechariah","zechariah",14],["瑪拉基書","玛拉基书","Malachi","malachi",4],["馬太福音","马太福音","Matthew","matthew",28],["馬可福音","马可福音","Mark","mark",16],["路加福音","路加福音","Luke","luke",24],["約翰福音","约翰福音","John","john",21],["使徒行傳","使徒行传","Acts","acts",28],["羅馬書","罗马书","Romans","romans",16],["哥林多前書","哥林多前书","1 Corinthians","1-corinthians",16],["哥林多後書","哥林多后书","2 Corinthians","2-corinthians",13],["加拉太書","加拉太书","Galatians","galatians",6],["以弗所書","以弗所书","Ephesians","ephesians",6],["腓立比書","腓立比书","Philippians","philippians",4],["歌羅西書","歌罗西书","Colossians","colossians",4],["帖撒羅尼迦前書","帖撒罗尼迦前书","1 Thessalonians","1-thessalonians",5],["帖撒羅尼迦後書","帖撒罗尼迦后书","2 Thessalonians","2-thessalonians",3],["提摩太前書","提摩太前书","1 Timothy","1-timothy",6],["提摩太後書","提摩太后书","2 Timothy","2-timothy",4],["提多書","提多书","Titus","titus",3],["腓利門書","腓利门书","Philemon","philemon",1],["希伯來書","希伯来书","Hebrews","hebrews",13],["雅各書","雅各书","James","james",5],["彼得前書","彼得前书","1 Peter","1-peter",5],["彼得後書","彼得后书","2 Peter","2-peter",3],["約翰一書","约翰一书","1 John","1-john",5],["約翰二書","约翰二书","2 John","2-john",1],["約翰三書","约翰三书","3 John","3-john",1],["猶大書","犹大书","Jude","jude",1],["啟示錄","启示录","Revelation","revelation",22]
+];
+
+let currentFontSize=40,currentTitleFontSize=32,currentThemeId="dark-navy",currentVersion="cuv-t";
+
+function getBookName(idx){
+  const v=VERSIONS.find(v=>v.id===currentVersion);
+  if(v.lang==="zh-t")return BOOKS[idx][0];
+  if(v.lang==="zh-s")return BOOKS[idx][1];
+  return BOOKS[idx][2];
+}
+
+/* ===== T2S converter ===== */
+const T2S_PAIRS="與与書书記记數数從从歷历國国導导傳传說说話话語语詩诗預预約约這这個个為为過过認认開开們们對对問问應应東东將将時时經经裏里長长門门間间關关頭头點点進进還还邊边麼么會会義义聖圣聲声處处號号見见讓让許许謝谢論论該该講讲讀读變变買买車车轉转軍军隨随電电離离馬马當当發发祂祂裡里實实種种稱称總总華华萬万葉叶選选遠远運运連连達达鄰邻雖虽雲云養养聯联禱祷後后兒儿眾众卻却須须屬属學学層层豐丰質质類类題题體体點点釘钉軟软輕轻載载鬧闹獅狮壓压辦办歸归歡欢歎叹環环瑪玛葡葡園园堅坚執执場场報报壁壁夢梦奪夺婦妇嬰婴寧宁審审寶宝導导崇崇嶺岭廟庙應应懶懒慣惯戰战損损撒撒擊击擁拥擴扩攻攻權权條条極极標标樓楼歌歌殘残毀毁污污漁渔潔洁災灾營营獻献獸兽瓦瓦瞎瞎網网罪罪聚聚脫脱腐腐般般蒙蒙蛇蛇術术衛卫裂裂覺觉討讨証证詞词詳详誇夸誡诫課课諸诸謀谋譯译識识議议護护貝贝貧贫貪贪賊贼賞赏贖赎路路較较辨辨農农遣遣避避釋释鄉乡錢钱鍊链鎖锁鏈链鑰钥閃闪閉闭闡阐陣阵陰阴陸陆隊队隱隐雕雕震震響响領领顧顾餘余駱骆驅驱驟骤鬥斗鬼鬼魂魂魔魔齋斋齒齿塵尘獎奖壘垒穌稣藝艺業业飢饥飛飞飯饭餅饼養养禮礼壞坏敵敌僕仆態态勸劝雙双難难風风飄飘騎骑鑄铸鏡镜險险頸颈寫写結结給给職职範范臨临殺杀統统詢询魚鱼鳥鸟麥麦齊齐壇坛師师廣广獄狱願愿獨独練练節节歲岁幾几斷断築筑線线燈灯滿满漸渐殿殿瑪玛親亲觀观計计裝装聯联聯联聽听財财賜赐";
+const _t2sMap=new Map();for(let i=0;i<T2S_PAIRS.length;i+=2)_t2sMap.set(T2S_PAIRS[i],T2S_PAIRS[i+1]);
+function t2s(text){return[...text].map(c=>_t2sMap.get(c)||c).join("")}
+
+/* ===== CRC-32 & ZIP ===== */
+const crcT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c}return t})();
+function crc32(buf){let c=0xFFFFFFFF;for(let i=0;i<buf.length;i++)c=crcT[(c^buf[i])&0xFF]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+class MiniZip{
+  constructor(){this.files=[]}
+  add(name,text){const d=new TextEncoder().encode(text);this.files.push({n:new TextEncoder().encode(name),d,c:crc32(d)})}
+  build(){
+    let off=0;const L=[],C=[];
+    for(const f of this.files){
+      const h=new DataView(new ArrayBuffer(30));
+      h.setUint32(0,0x04034b50,!0);h.setUint16(4,20,!0);h.setUint16(6,0x0800,!0);h.setUint16(8,0,!0);h.setUint16(10,33,!0);h.setUint16(12,0x5821,!0);h.setUint32(14,f.c,!0);h.setUint32(18,f.d.length,!0);h.setUint32(22,f.d.length,!0);h.setUint16(26,f.n.length,!0);h.setUint16(28,0,!0);
+      L.push({h:new Uint8Array(h.buffer),n:f.n,d:f.d,o:off});off+=30+f.n.length+f.d.length;
+      const c=new DataView(new ArrayBuffer(46));
+      c.setUint32(0,0x02014b50,!0);c.setUint16(4,20,!0);c.setUint16(6,20,!0);c.setUint16(8,0x0800,!0);c.setUint16(10,0,!0);c.setUint16(12,33,!0);c.setUint16(14,0x5821,!0);c.setUint32(16,f.c,!0);c.setUint32(20,f.d.length,!0);c.setUint32(24,f.d.length,!0);c.setUint16(28,f.n.length,!0);c.setUint16(30,0,!0);c.setUint16(32,0,!0);c.setUint16(34,0,!0);c.setUint16(36,0,!0);c.setUint32(38,0,!0);c.setUint32(42,L[L.length-1].o,!0);
+      C.push({h:new Uint8Array(c.buffer),n:f.n});
+    }
+    let cdSz=0;for(const c of C)cdSz+=46+c.n.length;
+    const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,!0);e.setUint16(4,0,!0);e.setUint16(6,0,!0);e.setUint16(8,this.files.length,!0);e.setUint16(10,this.files.length,!0);e.setUint32(12,cdSz,!0);e.setUint32(16,off,!0);e.setUint16(20,0,!0);
+    const out=new Uint8Array(off+cdSz+22);let p=0;
+    for(const l of L){out.set(l.h,p);p+=30;out.set(l.n,p);p+=l.n.length;out.set(l.d,p);p+=l.d.length}
+    for(const c of C){out.set(c.h,p);p+=46;out.set(c.n,p);p+=c.n.length}
+    out.set(new Uint8Array(e.buffer),p);return out;
+  }
+}
+
+/* ===== OOXML ===== */
+const SLD_CX=9144000,SLD_CY=5143500;
+function emu(inch){return Math.round(inch*914400)}
+function escX(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function contentTypes(n){let o='';for(let i=1;i<=n;i++)o+=`<Override PartName="/ppt/slides/slide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`;return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/ppt/presProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presProps+xml"/><Override PartName="/ppt/viewProps.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.viewProps+xml"/><Override PartName="/ppt/tableStyles.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.tableStyles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>${o}</Types>`}
+const rootRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>`;
+const coreXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>聖經經文投影片</dc:title><dc:creator>Bible Verse Slide Generator</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">2025-01-01T00:00:00Z</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">2025-01-01T00:00:00Z</dcterms:modified></cp:coreProperties>`;
+function appXml(n){return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Microsoft Office PowerPoint</Application><Slides>${n}</Slides><ScaleCrop>false</ScaleCrop><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged></Properties>`}
+const presPropsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:presentationPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>`;
+const viewPropsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:viewPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:normalViewPr horzBarState="maximized"><p:restoredLeft sz="15611"/><p:restoredTop sz="94610"/></p:normalViewPr><p:slideViewPr><p:cSldViewPr snapToGrid="0" snapToObjects="1"><p:cViewPr varScale="1"><p:scale><a:sx n="136" d="100"/><a:sy n="136" d="100"/></p:scale><p:origin x="216" y="312"/></p:cViewPr><p:guideLst/></p:cSldViewPr></p:slideViewPr><p:notesTextViewPr><p:cViewPr><p:scale><a:sx n="1" d="1"/><a:sy n="1" d="1"/></p:scale><p:origin x="0" y="0"/></p:cViewPr></p:notesTextViewPr><p:gridSpacing cx="76200" cy="76200"/></p:viewPr>`;
+const tableStylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<a:tblStyleLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>`;
+function makePres(n){let ids='',sldRels='';for(let i=1;i<=n;i++){ids+=`<p:sldId id="${255+i}" r:id="rId${i+1}"/>`;sldRels+=`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i}.xml"/>`}const lastId=n+2;return{xml:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" saveSubsetFonts="1" autoCompressPictures="0"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>${ids}</p:sldIdLst><p:sldSz cx="${SLD_CX}" cy="${SLD_CY}"/><p:notesSz cx="${SLD_CY}" cy="${SLD_CX}"/><p:defaultTextStyle><a:lvl1pPr marL="0" algn="l" defTabSz="914400" rtl="0" eaLnBrk="1" latinLnBrk="0" hangingPunct="1"><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr></p:defaultTextStyle></p:presentation>`,rels:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/>${sldRels}<Relationship Id="rId${lastId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="presProps.xml"/><Relationship Id="rId${lastId+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/viewProps" Target="viewProps.xml"/><Relationship Id="rId${lastId+2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/><Relationship Id="rId${lastId+3}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableStyles" Target="tableStyles.xml"/></Relationships>`}}
+const theme1=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="44546A"/></a:dk2><a:lt2><a:srgbClr val="E7E6E6"/></a:lt2><a:accent1><a:srgbClr val="4472C4"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2><a:accent3><a:srgbClr val="A5A5A5"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="5B9BD5"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Microsoft JhengHei"/><a:ea typeface="Microsoft JhengHei"/><a:cs typeface="Microsoft JhengHei"/></a:majorFont><a:minorFont><a:latin typeface="Microsoft JhengHei"/><a:ea typeface="Microsoft JhengHei"/><a:cs typeface="Microsoft JhengHei"/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>`;
+const sldMaster=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:hf sldNum="0" hdr="0" ftr="0" dt="0"/><p:txStyles><p:titleStyle><a:lvl1pPr algn="ctr" rtl="0" eaLnBrk="1" hangingPunct="1"><a:spcBef><a:spcPct val="0"/></a:spcBef><a:buNone/><a:defRPr sz="4400" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mj-lt"/><a:ea typeface="+mj-ea"/><a:cs typeface="+mj-cs"/></a:defRPr></a:lvl1pPr></p:titleStyle><p:bodyStyle><a:lvl1pPr marL="342900" indent="-342900" algn="l" rtl="0" eaLnBrk="1" hangingPunct="1"><a:spcBef><a:spcPct val="20000"/></a:spcBef><a:buFont typeface="Arial" pitchFamily="34" charset="0"/><a:buChar char="\u2022"/><a:defRPr sz="3200" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr></p:bodyStyle><p:otherStyle><a:lvl1pPr marL="0" algn="l" rtl="0" eaLnBrk="1" hangingPunct="1"><a:defRPr kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr></p:otherStyle></p:txStyles></p:sldMaster>`;
+const sldMasterRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/></Relationships>`;
+const sldLayout=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" preserve="1"><p:cSld name="DEFAULT"><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>`;
+const sldLayoutRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>`;
+const slideRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>`;
+function mkRect(id,x,y,w,h,color){return`<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Shape ${id}"></p:cNvPr><p:cNvSpPr/><p:nvPr></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst></a:avLst></a:prstGeom><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:ln></a:ln></p:spPr></p:sp>`}
+function mkText(id,x,y,w,h,text,fontSize,color,bold){const sz=fontSize*100;return`<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="Text ${id}"></p:cNvPr><p:cNvSpPr/><p:nvPr></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst></a:avLst></a:prstGeom><a:noFill/><a:ln></a:ln></p:spPr><p:txBody><a:bodyPr wrap="square" rtlCol="0" anchor="t"></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="l" indent="0" marL="0"><a:buNone/></a:pPr><a:r><a:rPr lang="zh-TW" sz="${sz}"${bold?' b="1"':''} dirty="0"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:latin typeface="Microsoft JhengHei" pitchFamily="34" charset="0"/><a:ea typeface="Microsoft JhengHei" pitchFamily="34" charset="-122"/><a:cs typeface="Microsoft JhengHei" pitchFamily="34" charset="-120"/></a:rPr><a:t>${escX(text)}</a:t></a:r><a:endParaRPr lang="zh-TW" sz="${sz}" dirty="0"/></a:p></p:txBody></p:sp>`}
+function makeSlide(bg,title,body,fontSize,titleFontSize,tc,bc){const mx=emu(0.75),cw=SLD_CX-2*mx,tly=emu(0.35),tlh=emu(0.008),ty=emu(0.5),th=emu(0.65),dy=emu(1.22),dw=emu(2.5),dx=Math.round((SLD_CX-dw)/2),by=emu(1.4),bly=SLD_CY-emu(0.35),bh=bly-by-emu(0.12);return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name=""><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${bg}"/></a:solidFill></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${mkRect(2,mx,tly,cw,tlh,tc)}${mkText(3,mx,ty,cw,th,title,titleFontSize,tc,true)}${mkRect(4,dx,dy,dw,emu(0.006),tc)}${mkText(5,mx,by,cw,bh,body,fontSize,bc,false)}${mkRect(6,mx,bly,cw,tlh,tc)}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`}
+
+/* ===== TEXT SPLITTING ===== */
+function charsPerSlide(fs){const cw=fs/72;const cpl=Math.floor(8.5/cw);const lh=fs/72;const lines=Math.floor(3.75/lh);return Math.floor(cpl*lines*0.9)}
+function splitText(text,fs){
+  const max=charsPerSlide(fs);
+  if(text.length<=max)return[text];
+  // Try to split by verse boundaries first (pattern: number followed by space at start or after content)
+  const versePattern=/(?=(?:^|\s)\d+\s)/g;
+  const verses=text.split(versePattern).filter(s=>s.trim());
+  // If we found multiple verses, group them by slide capacity
+  if(verses.length>1){
+    const slides=[];let cur="";
+    for(const v of verses){
+      const candidate=cur?cur+v:v;
+      if(candidate.length>max&&cur){
+        slides.push(cur.trim());
+        cur=v;
+      }else{
+        cur=candidate;
+      }
+    }
+    if(cur.trim())slides.push(cur.trim());
+    // Check if any single verse exceeds max (very rare for Bible verses)
+    const res=[];
+    for(const sl of slides){
+      if(sl.length<=max)res.push(sl);
+      else{
+        // Fallback: split long single verse by punctuation
+        const sents=sl.split(/(?<=[。！？；.\n])/);
+        let c="";
+        for(const s of sents){if((c+s).length>max&&c){res.push(c.trim());c=s}else c+=s}
+        if(c.trim())res.push(c.trim());
+      }
+    }
+    return res;
+  }
+  // Fallback: no verse numbers detected, split by punctuation
+  const sents=text.split(/(?<=[。！？；.\n])/);
+  const slides=[];let cur="";
+  for(const s of sents){if((cur+s).length>max&&cur){slides.push(cur.trim());cur=s}else cur+=s}
+  if(cur.trim())slides.push(cur.trim());
+  const res=[];
+  for(const sl of slides){if(sl.length<=max)res.push(sl);else for(let i=0;i<sl.length;i+=max)res.push(sl.slice(i,i+max))}
+  return res;
+}
+
+/* ===== DATA LOADING (all full JSON, no per-chapter API) ===== */
+const bibleCache={};
+
+async function loadFullBible(dataKey,url){
+  if(bibleCache[dataKey])return bibleCache[dataKey];
+  const r=await fetch(url);
+  if(!r.ok)throw new Error("無法載入聖經資料");
+  bibleCache[dataKey]=await r.json();
+  return bibleCache[dataKey];
+}
+
+async function getChapterVerses(versionId,bookIdx,chapter){
+  const v=VERSIONS.find(v=>v.id===versionId);
+  const bible=await loadFullBible(v.dataKey,v.url);
+  return bible[bookIdx].chapters[chapter-1];
+}
+
+async function getVerseCount(bookIdx,chapter){
+  const verses=await getChapterVerses(currentVersion,bookIdx,chapter);
+  return verses.length;
+}
+
+/* ===== CASCADE DROPDOWNS ===== */
+function fillSelect(sel,count,startFrom){sel.innerHTML="";for(let i=startFrom||1;i<=count;i++){const o=document.createElement("option");o.value=i;o.textContent=i;sel.appendChild(o)}}
+
+function populateBooks(){
+  const sel=document.getElementById("bookSelect");
+  sel.innerHTML="";
+  BOOKS.forEach((b,i)=>{
+    const o=document.createElement("option");o.value=i;o.textContent=getBookName(i);
+    if(i===42)o.selected=true; // 約翰福音
+    sel.appendChild(o);
+  });
+}
+
+async function onVersionChange(){
+  currentVersion=document.getElementById("versionSelect").value;
+  populateBooks();
+  const v=VERSIONS.find(v=>v.id===currentVersion);
+  try{await loadFullBible(v.dataKey,v.url)}catch(e){}
+  await onBookChange();
+}
+
+async function onBookChange(){
+  const err=document.getElementById("errorMsg");err.style.display="none";
+  const bookIdx=parseInt(document.getElementById("bookSelect").value);
+  const chapters=BOOKS[bookIdx][4];
+  fillSelect(document.getElementById("chapterSelect"),chapters);
+  await onChapterChange();
+}
+
+async function onChapterChange(){
+  const err=document.getElementById("errorMsg");err.style.display="none";
+  const bookIdx=parseInt(document.getElementById("bookSelect").value);
+  const ch=parseInt(document.getElementById("chapterSelect").value);
+  try{
+    const count=await getVerseCount(bookIdx,ch);
+    fillSelect(document.getElementById("verseStartSelect"),count);
+    onVerseStartChange_sync(count);
+  }catch(e){
+    fillSelect(document.getElementById("verseStartSelect"),30);
+    onVerseStartChange_sync(30);
+  }
+}
+
+function onVerseStartChange(){
+  const bookIdx=parseInt(document.getElementById("bookSelect").value);
+  const ch=parseInt(document.getElementById("chapterSelect").value);
+  const v=VERSIONS.find(v=>v.id===currentVersion);
+  let total=30;
+  if(bibleCache[v.dataKey]){
+    total=bibleCache[v.dataKey][bookIdx].chapters[ch-1].length;
+  }
+  onVerseStartChange_sync(total);
+}
+
+function onVerseStartChange_sync(totalV){
+  const vs=parseInt(document.getElementById("verseStartSelect").value);
+  const sel=document.getElementById("verseEndSelect");
+  sel.innerHTML="";
+  const dash=document.createElement("option");dash.value="-";dash.textContent="-";sel.appendChild(dash);
+  for(let i=vs+1;i<=totalV;i++){const o=document.createElement("option");o.value=i;o.textContent=i;sel.appendChild(o)}
+}
+
+/* ===== FETCH VERSE ===== */
+async function fetchVerse(){
+  const bookIdx=parseInt(document.getElementById("bookSelect").value);
+  const ch=parseInt(document.getElementById("chapterSelect").value);
+  const vs=parseInt(document.getElementById("verseStartSelect").value);
+  const veVal=document.getElementById("verseEndSelect").value;
+  const ve=veVal==="-"?0:parseInt(veVal);
+  const err=document.getElementById("errorMsg");
+  err.style.display="none";
+  const bookName=getBookName(bookIdx);
+  const disp=ve?`${bookName} ${ch}:${vs}-${ve}`:`${bookName} ${ch}:${vs}`;
+  const btn=document.getElementById("searchBtn");btn.disabled=true;btn.textContent="載入中⋯";
+  try{
+    const v=VERSIONS.find(v=>v.id===currentVersion);
+    const endV=ve||vs;
+    const chData=await getChapterVerses(currentVersion,bookIdx,ch);
+    if(vs<1||endV>chData.length)throw new Error(`節數超出範圍（本章共 ${chData.length} 節）`);
+    let parts=[];
+    for(let i=vs;i<=endV;i++){
+      let txt=(chData[i-1]||"").replace(/ /g," ").trim();
+      if(v.lang==="zh-t")txt=txt.replace(/ /g,"");
+      if(v.lang==="zh-s")txt=t2s(txt.replace(/ /g,""));
+      parts.push(`${i} ${txt}`);
+    }
+    const text=parts.join(v.lang==="en"?" ":"");
+    document.getElementById("referenceInput").value=disp;
+    document.getElementById("verseInput").value=text.trim();
+    switchMode("manual");updatePreview();
+  }catch(e){err.textContent=e.message;err.style.display="block"}
+  btn.disabled=false;btn.textContent="查詢經文";
+}
+
+/* ===== UI ===== */
+function switchMode(m){
+  document.querySelectorAll(".tab-btn").forEach((b,i)=>b.classList.toggle("active",(i===0&&m==="manual")||(i===1&&m==="search")));
+  document.getElementById("searchPanel").style.display=m==="search"?"block":"none";
+  document.getElementById("manualPanel").style.display=m==="manual"?"block":"none";
+}
+function selectFontSize(v){currentFontSize=v;document.querySelectorAll(".font-btn:not(.title-font-btn)").forEach(b=>b.classList.toggle("active",+b.dataset.value===v));updatePreview()}
+function selectTitleFontSize(v){currentTitleFontSize=v;document.querySelectorAll(".title-font-btn").forEach(b=>b.classList.toggle("active",+b.dataset.value===v));updatePreview()}
+function selectTheme(id){currentThemeId=id;document.querySelectorAll(".theme-card").forEach(c=>c.classList.toggle("active",c.dataset.id===id));updatePreview()}
+function getTheme(){return THEMES.find(t=>t.id===currentThemeId)}
+
+function updatePreview(){
+  const ref=document.getElementById("referenceInput").value.trim();
+  const text=document.getElementById("verseInput").value.trim();
+  const pc=document.getElementById("previewCard"),ps=document.getElementById("previewSlides");
+  const btn=document.getElementById("generateBtn"),hint=document.getElementById("generateHint");
+  const ok=ref&&text;btn.disabled=!ok;hint.textContent=ok?"":"請先輸入經文出處與內容";
+  if(!ok){pc.style.display="none";return}
+  const slides=splitText(text,currentFontSize),theme=getTheme(),tot=slides.length;
+  document.getElementById("previewLabel").textContent=`預覽（共 ${tot} 張投影片）`;
+  pc.style.display="block";
+  ps.innerHTML=slides.map((st,i)=>{
+    const title=ref;
+    const fs=`clamp(11px,${currentFontSize/3.2}vw,${currentFontSize*0.5}px)`;
+    const tfs=`clamp(10px,${currentTitleFontSize/4}vw,${currentTitleFontSize*0.5}px)`;
+    return`<div class="slide-preview" style="background:${theme.bg};${theme.border||''}">
+      <div class="slide-line" style="top:7%;background:${theme.accent}"></div>
+      <div class="slide-title-text" style="color:${theme.titleColor};font-size:${tfs}">${title}</div>
+      <div class="slide-body" style="color:${theme.textColor};font-size:${fs}">${st}</div>
+      <div class="slide-line" style="bottom:5%;background:${theme.accent}"></div>
+    </div>`}).join("");
+}
+
+/* ===== GENERATE ===== */
+function generatePPTX(){
+  const ref=document.getElementById("referenceInput").value.trim();
+  const text=document.getElementById("verseInput").value.trim();
+  if(!ref||!text)return;
+  const btn=document.getElementById("generateBtn");btn.disabled=true;btn.textContent="生成中⋯";
+  try{
+    const slides=splitText(text,currentFontSize),theme=getTheme(),tot=slides.length;
+    const zip=new MiniZip();
+    zip.add("[Content_Types].xml",contentTypes(tot));
+    zip.add("_rels/.rels",rootRels);
+    zip.add("docProps/core.xml",coreXml);
+    zip.add("docProps/app.xml",appXml(tot));
+    const p=makePres(tot);
+    zip.add("ppt/presentation.xml",p.xml);
+    zip.add("ppt/_rels/presentation.xml.rels",p.rels);
+    zip.add("ppt/presProps.xml",presPropsXml);
+    zip.add("ppt/viewProps.xml",viewPropsXml);
+    zip.add("ppt/tableStyles.xml",tableStylesXml);
+    zip.add("ppt/theme/theme1.xml",theme1);
+    zip.add("ppt/slideMasters/slideMaster1.xml",sldMaster);
+    zip.add("ppt/slideMasters/_rels/slideMaster1.xml.rels",sldMasterRels);
+    zip.add("ppt/slideLayouts/slideLayout1.xml",sldLayout);
+    zip.add("ppt/slideLayouts/_rels/slideLayout1.xml.rels",sldLayoutRels);
+    slides.forEach((st,i)=>{
+      const title=ref;
+      zip.add(`ppt/slides/slide${i+1}.xml`,makeSlide(theme.pptBg,title,st,currentFontSize,currentTitleFontSize,theme.pptTitle,theme.pptText));
+      zip.add(`ppt/slides/_rels/slide${i+1}.xml.rels`,slideRels);
+    });
+    const blob=new Blob([zip.build()],{type:"application/vnd.openxmlformats-officedocument.presentationml.presentation"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${ref}.pptx`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  }catch(e){alert("產生投影片時發生錯誤："+e.message)}
+  btn.disabled=false;btn.textContent="下載 PowerPoint 投影片";
+}
+
+/* ===== INIT ===== */
+(async function(){
+  // Version selector
+  const vs=document.getElementById("versionSelect");
+  VERSIONS.forEach(v=>{const o=document.createElement("option");o.value=v.id;o.textContent=v.name;if(v.id==="cuv-t")o.selected=true;vs.appendChild(o)});
+  // Book list
+  populateBooks();
+  // Font sizes
+  const fc=document.getElementById("fontOptions");
+  FONT_SIZES.forEach(f=>{const b=document.createElement("button");b.className="font-btn"+(f.v===currentFontSize?" active":"");b.textContent=f.l;b.dataset.value=f.v;b.onclick=()=>selectFontSize(f.v);fc.appendChild(b)});
+  const tfc=document.getElementById("titleFontOptions");
+  TITLE_FONT_SIZES.forEach(f=>{const b=document.createElement("button");b.className="font-btn title-font-btn"+(f.v===currentTitleFontSize?" active":"");b.textContent=f.l;b.dataset.value=f.v;b.onclick=()=>selectTitleFontSize(f.v);tfc.appendChild(b)});
+  // Themes
+  const tc=document.getElementById("themeGrid");
+  THEMES.forEach(t=>{const c=document.createElement("div");c.className="theme-card"+(t.id===currentThemeId?" active":"");c.dataset.id=t.id;c.onclick=()=>selectTheme(t.id);c.innerHTML=`<div class="theme-preview" style="background:${t.bg};color:${t.titleColor};${t.border||''}">\u7D93\u6587</div><div class="theme-name">${t.name}</div><div class="theme-desc">${t.desc}</div>`;tc.appendChild(c)});
+  // Auto-load default version (CUV)
+  try{await loadFullBible("cuv","https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/zh_cuv.json");await onBookChange()}catch(e){
+    document.getElementById("errorMsg").textContent="自動載入聖經資料失敗，請按查詢經文重試";
+    document.getElementById("errorMsg").style.display="block";
+  }
+})();
+</script>
+</body>
+</html>
