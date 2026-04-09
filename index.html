@@ -67,6 +67,12 @@ select option{background:#1a1028;color:#e8e0f0}
   <p>輸入經文，一鍵生成精美 PowerPoint 投影片</p>
 </div>
 <div class="container">
+  <div id="fileWarning" style="display:none;background:rgba(200,160,50,0.15);border:1px solid rgba(200,160,50,0.3);border-radius:10px;padding:16px;margin-bottom:20px;font-size:13px;color:#e8c86a;line-height:1.6">
+    <b>⚠ 偵測到本機檔案模式</b><br>
+    您的瀏覽器可能會阻擋經文查詢功能。解決方法：<br>
+    ① 將此檔案上傳到網路（如 <a href="https://app.netlify.com/drop" target="_blank" style="color:#C9A96E">Netlify Drop</a>），用網址開啟<br>
+    ② 或使用「手動輸入」模式，直接貼上經文
+  </div>
   <div class="tabs">
     <button class="tab-btn" onclick="switchMode('manual')">手動輸入</button>
     <button class="tab-btn active" onclick="switchMode('search')">經文查詢</button>
@@ -211,47 +217,86 @@ function mkText(id,x,y,w,h,text,fontSize,color,bold){const sz=fontSize*100;retur
 function makeSlide(bg,title,body,fontSize,titleFontSize,tc,bc){const mx=emu(0.75),cw=SLD_CX-2*mx,tly=emu(0.35),tlh=emu(0.008),ty=emu(0.5),th=emu(0.65),dy=emu(1.22),dw=emu(2.5),dx=Math.round((SLD_CX-dw)/2),by=emu(1.4),bly=SLD_CY-emu(0.35),bh=bly-by-emu(0.12);return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name=""><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${bg}"/></a:solidFill></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${mkRect(2,mx,tly,cw,tlh,tc)}${mkText(3,mx,ty,cw,th,title,titleFontSize,tc,true)}${mkRect(4,dx,dy,dw,emu(0.006),tc)}${mkText(5,mx,by,cw,bh,body,fontSize,bc,false)}${mkRect(6,mx,bly,cw,tlh,tc)}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`}
 
 /* ===== TEXT SPLITTING ===== */
-function charsPerSlide(fs){const cw=fs/72;const cpl=Math.floor(8.5/cw);const lh=fs/72;const lines=Math.floor(3.75/lh);return Math.floor(cpl*lines*0.9)}
-function splitText(text,fs){
-  const max=charsPerSlide(fs);
-  if(text.length<=max)return[text];
-  // Try to split by verse boundaries first (pattern: number followed by space at start or after content)
-  const versePattern=/(?=(?:^|\s)\d+\s)/g;
-  const verses=text.split(versePattern).filter(s=>s.trim());
-  // If we found multiple verses, group them by slide capacity
-  if(verses.length>1){
-    const slides=[];let cur="";
-    for(const v of verses){
-      const candidate=cur?cur+v:v;
-      if(candidate.length>max&&cur){
-        slides.push(cur.trim());
-        cur=v;
-      }else{
-        cur=candidate;
-      }
-    }
-    if(cur.trim())slides.push(cur.trim());
-    // Check if any single verse exceeds max (very rare for Bible verses)
-    const res=[];
-    for(const sl of slides){
-      if(sl.length<=max)res.push(sl);
-      else{
-        // Fallback: split long single verse by punctuation
-        const sents=sl.split(/(?<=[。！？；.\n])/);
-        let c="";
-        for(const s of sents){if((c+s).length>max&&c){res.push(c.trim());c=s}else c+=s}
-        if(c.trim())res.push(c.trim());
-      }
-    }
-    return res;
+function slideLimits(fs){
+  // Body area: 8.5" wide x 3.75" tall at single spacing
+  // Use conservative safety factor so text never reaches the bottom decorative line
+  const cw=fs/72;
+  const charsPerLine=Math.floor(8.5/cw);
+  const lineH=fs/72;
+  const linesPerSlide=Math.floor(3.75/lineH*0.82); // leave ~18% bottom breathing room
+  return{charsPerLine,linesPerSlide};
+}
+
+// Count lines a piece of text takes when wrapped (each \n is a hard break too)
+function linesNeeded(text,charsPerLine){
+  if(!text)return 0;
+  let lines=0;
+  for(const para of text.split("\n")){
+    lines+=Math.max(1,Math.ceil(para.length/charsPerLine));
   }
-  // Fallback: no verse numbers detected, split by punctuation
+  return lines;
+}
+
+function splitText(text,fs){
+  const{charsPerLine,linesPerSlide}=slideLimits(fs);
+  // Detect verses by number + space pattern (preceded by non-digit)
+  const versePattern=/(?<![0-9])(?=\d+ )/g;
+  const verses=text.split(versePattern).map(s=>s.trim()).filter(s=>s);
+
+  if(verses.length>1){
+    // Each verse gets its own "block"; each block starts on a new line.
+    const slides=[];
+    let curText="";
+    let curLines=0;
+    for(const v of verses){
+      const vLines=linesNeeded(v,charsPerLine);
+      // If verse alone exceeds slide capacity, it's unavoidable - place on its own slide and let it overflow/split
+      if(vLines>linesPerSlide){
+        if(curText){slides.push(curText);curText="";curLines=0}
+        // Split long verse by punctuation
+        const parts=[];
+        const sents=v.split(/(?<=[。！？；.\n])/);
+        let c="",cL=0;
+        for(const s of sents){
+          const sL=linesNeeded(s,charsPerLine);
+          if(cL+sL>linesPerSlide&&c){parts.push(c.trim());c=s;cL=sL}
+          else{c+=s;cL+=sL}
+        }
+        if(c.trim())parts.push(c.trim());
+        slides.push(...parts);
+        continue;
+      }
+      // Normal case: check if this verse fits on current slide
+      if(curLines+vLines>linesPerSlide&&curText){
+        // Doesn't fit - push current slide, start new one with this verse
+        slides.push(curText);
+        curText=v;
+        curLines=vLines;
+      }else{
+        curText=curText?curText+v:v;
+        curLines+=vLines;
+      }
+    }
+    if(curText)slides.push(curText);
+    return slides;
+  }
+
+  // No verse numbers: split by punctuation using line-based logic
   const sents=text.split(/(?<=[。！？；.\n])/);
-  const slides=[];let cur="";
-  for(const s of sents){if((cur+s).length>max&&cur){slides.push(cur.trim());cur=s}else cur+=s}
+  const slides=[];let cur="",curL=0;
+  for(const s of sents){
+    const sL=linesNeeded(s,charsPerLine);
+    if(curL+sL>linesPerSlide&&cur){slides.push(cur.trim());cur=s;curL=sL}
+    else{cur+=s;curL+=sL}
+  }
   if(cur.trim())slides.push(cur.trim());
+  // Hard split any slide still too long
   const res=[];
-  for(const sl of slides){if(sl.length<=max)res.push(sl);else for(let i=0;i<sl.length;i+=max)res.push(sl.slice(i,i+max))}
+  const maxChars=charsPerLine*linesPerSlide;
+  for(const sl of slides){
+    if(sl.length<=maxChars)res.push(sl);
+    else for(let i=0;i<sl.length;i+=maxChars)res.push(sl.slice(i,i+maxChars));
+  }
   return res;
 }
 
@@ -301,7 +346,7 @@ async function onVersionChange(){
 async function onBookChange(){
   const err=document.getElementById("errorMsg");err.style.display="none";
   const bookIdx=parseInt(document.getElementById("bookSelect").value);
-  const chapters=BOOKS[bookIdx][4];
+  const chapters=BOOKS[bookIdx][4]; // hardcoded, always available
   fillSelect(document.getElementById("chapterSelect"),chapters);
   await onChapterChange();
 }
@@ -310,13 +355,24 @@ async function onChapterChange(){
   const err=document.getElementById("errorMsg");err.style.display="none";
   const bookIdx=parseInt(document.getElementById("bookSelect").value);
   const ch=parseInt(document.getElementById("chapterSelect").value);
+  const v=VERSIONS.find(v=>v.id===currentVersion);
+  // Try to get exact verse count from loaded data
+  if(bibleCache[v.dataKey]){
+    try{
+      const count=bibleCache[v.dataKey][bookIdx].chapters[ch-1].length;
+      fillSelect(document.getElementById("verseStartSelect"),count);
+      onVerseStartChange_sync(count);
+      return;
+    }catch(e){}
+  }
+  // Data not loaded yet: try loading, fallback to 50
   try{
     const count=await getVerseCount(bookIdx,ch);
     fillSelect(document.getElementById("verseStartSelect"),count);
     onVerseStartChange_sync(count);
   }catch(e){
-    fillSelect(document.getElementById("verseStartSelect"),30);
-    onVerseStartChange_sync(30);
+    fillSelect(document.getElementById("verseStartSelect"),50);
+    onVerseStartChange_sync(50);
   }
 }
 
@@ -367,7 +423,11 @@ async function fetchVerse(){
     document.getElementById("referenceInput").value=disp;
     document.getElementById("verseInput").value=text.trim();
     switchMode("manual");updatePreview();
-  }catch(e){err.textContent=e.message;err.style.display="block"}
+  }catch(e){
+    let msg=e.message;
+    if(window.location.protocol==="file:")msg+="（本機檔案模式下，瀏覽器可能阻擋網路請求。請將檔案上傳到網路後使用，或改用手動輸入。）";
+    err.textContent=msg;err.style.display="block";
+  }
   btn.disabled=false;btn.textContent="查詢經文";
 }
 
@@ -442,6 +502,10 @@ function generatePPTX(){
 
 /* ===== INIT ===== */
 (async function(){
+  // Detect file:// protocol and show warning
+  if(window.location.protocol==="file:"){
+    document.getElementById("fileWarning").style.display="block";
+  }
   // Version selector
   const vs=document.getElementById("versionSelect");
   VERSIONS.forEach(v=>{const o=document.createElement("option");o.value=v.id;o.textContent=v.name;if(v.id==="cuv-t")o.selected=true;vs.appendChild(o)});
@@ -455,10 +519,24 @@ function generatePPTX(){
   // Themes
   const tc=document.getElementById("themeGrid");
   THEMES.forEach(t=>{const c=document.createElement("div");c.className="theme-card"+(t.id===currentThemeId?" active":"");c.dataset.id=t.id;c.onclick=()=>selectTheme(t.id);c.innerHTML=`<div class="theme-preview" style="background:${t.bg};color:${t.titleColor};${t.border||''}">\u7D93\u6587</div><div class="theme-name">${t.name}</div><div class="theme-desc">${t.desc}</div>`;tc.appendChild(c)});
-  // Auto-load default version (CUV)
-  try{await loadFullBible("cuv","https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/zh_cuv.json");await onBookChange()}catch(e){
-    document.getElementById("errorMsg").textContent="自動載入聖經資料失敗，請按查詢經文重試";
+  // Always populate chapter/verse dropdowns first (using hardcoded chapter counts)
+  await onBookChange();
+  // Then try loading bible data in background to get exact verse counts
+  try{
+    await loadFullBible("cuv","https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/zh_cuv.json");
+    // Refresh verse counts now that data is loaded
+    await onChapterChange();
+  }catch(e){
+    document.getElementById("errorMsg").textContent=window.location.protocol==="file:"?"本機檔案模式下無法自動載入經文資料。請將此檔案上傳到網路使用，或改用「手動輸入」模式。":"聖經資料載入中，請稍候再按查詢經文（或檢查網路連線）";
     document.getElementById("errorMsg").style.display="block";
+    // Retry after 3 seconds
+    setTimeout(async()=>{
+      try{
+        await loadFullBible("cuv","https://cdn.jsdelivr.net/gh/thiagobodruk/bible@master/json/zh_cuv.json");
+        document.getElementById("errorMsg").style.display="none";
+        await onChapterChange();
+      }catch(e2){}
+    },3000);
   }
 })();
 </script>
